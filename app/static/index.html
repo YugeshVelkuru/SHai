@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111827">
+  <title>SmartAssist — Voice support</title>
+  <style>
+    :root { color-scheme: dark; font: 16px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; background: #0b1020; color: #edf2ff; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(ellipse at 50% 5%, #1c2b50 0, #0b1020 56%); }
+    main { width: min(100%, 680px); min-height: min(760px, calc(100vh - 48px)); display: flex; flex-direction: column; border: 1px solid #293654; border-radius: 28px; background: #111a2cdd; box-shadow: 0 28px 90px #0008; overflow: hidden; }
+    header { padding: 25px 28px; border-bottom: 1px solid #293654; display:flex; align-items:center; gap:14px; }
+    .logo { width:42px;height:42px;border-radius:15px;display:grid;place-items:center;background:#3c6ff5;font-size:21px; }
+    h1 { margin:0;font-size:18px;letter-spacing:.01em; } header p { margin:2px 0 0;color:#98a8c7;font-size:13px; }
+    #conversation { flex:1; overflow:auto; padding:28px; display:flex; flex-direction:column; gap:16px; }
+    .message { max-width:85%;padding:13px 16px;border-radius:18px;white-space:pre-wrap;overflow-wrap:anywhere; }
+    .assistant { align-self:flex-start;background:#202c43;border:1px solid #2c3b57;border-bottom-left-radius:5px; }
+    .user { align-self:flex-end;background:#315fdb;border-bottom-right-radius:5px; }
+    .welcome { margin:auto;text-align:center;max-width:420px;color:#c3cde0; } .welcome strong { display:block;font-size:22px;color:#f1f5ff;margin-bottom:8px; }
+    footer { border-top:1px solid #293654;padding:22px 24px 24px;text-align:center; }
+    #talk { width:76px;height:76px;border:0;border-radius:50%;background:#416ff0;color:white;font-size:28px;cursor:pointer;box-shadow:0 0 0 9px #416ff022;transition:.18s; }
+    #talk:hover { transform:scale(1.04); } #talk.listening { background:#ef5366;box-shadow:0 0 0 12px #ef536622;animation:pulse 1.5s infinite; }
+    @keyframes pulse { 50% { box-shadow:0 0 0 20px #ef536610; } }
+    #status { min-height:24px;margin:14px 0 0;color:#aab8d2;font-size:14px; } .hint { margin:4px 0 0;color:#73819d;font-size:12px; }
+    .error { color:#ff9da8; }
+    @media(max-width:520px) { body{padding:0} main{min-height:100vh;border-radius:0;border:0} header{padding:18px 20px} #conversation{padding:20px} }
+  </style>
+</head>
+<body>
+  <main>
+    <header><div class="logo" aria-hidden="true">✦</div><div><h1>SmartAssist</h1><p>Voice support assistant</p></div></header>
+    <section id="conversation" aria-live="polite">
+      <div class="welcome" id="welcome"><strong>Hi, I’m SmartAssist.</strong>Tap the microphone and tell me what you need. I can answer support questions or help with tickets.</div>
+    </section>
+    <footer>
+      <button id="talk" aria-label="Start speaking" title="Start speaking">🎙</button>
+      <p id="status">Tap the microphone to talk</p>
+      <p class="hint">Your browser will ask for microphone access.</p>
+    </footer>
+  </main>
+  <script>
+    (() => {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const button = document.getElementById('talk');
+      const status = document.getElementById('status');
+      const conversation = document.getElementById('conversation');
+      const welcome = document.getElementById('welcome');
+      let recognition;
+      let listening = false;
+      const session = `projects/smartassist/sessions/voice-${crypto.randomUUID()}`;
+      function bubble(text, role) {
+        welcome?.remove();
+        const item = document.createElement('div');
+        item.className = `message ${role}`;
+        item.textContent = text;
+        conversation.appendChild(item);
+        conversation.scrollTop = conversation.scrollHeight;
+      }
+      function speak(text) {
+        if (!('speechSynthesis' in window)) return;
+        speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.onend = () => { if (listening) status.textContent = 'Listening… go ahead'; };
+        speechSynthesis.speak(utterance);
+      }
+      async function send(text) {
+        bubble(text, 'user');
+        status.classList.remove('error');
+        status.textContent = 'Thinking…';
+        try {
+          const response = await fetch('/api/v1/webhook', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ intentInfo:{displayName:'',confidence:0}, sessionInfo:{session}, text })
+          });
+          if (!response.ok) throw new Error(`Server returned ${response.status}`);
+          const data = await response.json();
+          const reply = data.fulfillment_response?.messages?.find(m => m.text?.text)?.text?.text?.[0] || 'Sorry, I could not form a reply.';
+          bubble(reply, 'assistant');
+          speak(reply);
+          if (!listening) status.textContent = 'Tap the microphone to speak again';
+        } catch (error) {
+          status.classList.add('error');
+          status.textContent = 'Could not reach SmartAssist. Check that the server is running.';
+        }
+      }
+      if (!SpeechRecognition) {
+        status.classList.add('error');
+        status.textContent = 'Voice input is not supported in this browser. Try Chrome or Edge.';
+        button.disabled = true;
+        return;
+      }
+      recognition = new SpeechRecognition();
+      recognition.lang = navigator.language || 'en-US';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.onstart = () => { listening = true; button.classList.add('listening'); button.setAttribute('aria-label','Stop listening'); status.textContent = 'Listening… go ahead'; };
+      recognition.onresult = event => { const text = event.results[0][0].transcript.trim(); if (text) send(text); };
+      recognition.onerror = event => {
+        listening = false; button.classList.remove('listening'); button.setAttribute('aria-label','Start speaking');
+        status.classList.add('error');
+        status.textContent = event.error === 'not-allowed' ? 'Microphone access is blocked. Allow it in your browser settings.' : `Voice input error: ${event.error}. Tap to try again.`;
+      };
+      recognition.onend = () => { listening = false; button.classList.remove('listening'); button.setAttribute('aria-label','Start speaking'); if (status.textContent.startsWith('Listening')) status.textContent = 'Tap the microphone to talk'; };
+      button.addEventListener('click', () => {
+        speechSynthesis?.cancel();
+        if (listening) recognition.stop();
+        else { status.classList.remove('error'); try { recognition.start(); } catch (_) {} }
+      });
+    })();
+  </script>
+</body>
+</html>

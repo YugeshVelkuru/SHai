@@ -1,0 +1,165 @@
+{
+  "displayName": "SmartAssist AI Agent",
+  "defaultLanguageCode": "en",
+  "timeZone": "Asia/Kolkata",
+  "description": "Enterprise customer support conversational agent with webhook fulfillment",
+  "advancedSettings": {
+    "loggingSettings": {
+      "enableStackdriverLogging": true,
+      "enableInteractionLogging": true
+    }
+  },
+  "intents": [
+    {
+      "displayName": "greeting",
+      "trainingPhrases": [
+        "hello", "hi", "hey", "good morning", "good evening", "start"
+      ],
+      "parameters": [],
+      "webhookFulfillment": true
+    },
+    {
+      "displayName": "goodbye",
+      "trainingPhrases": [
+        "bye", "goodbye", "thanks that's all", "no more questions", "done"
+      ],
+      "webhookFulfillment": true
+    },
+    {
+      "displayName": "track.ticket",
+      "trainingPhrases": [
+        "track my ticket {ticket_number}",
+        "what is the status of ticket {ticket_number}",
+        "check ticket {ticket_number}",
+        "where is my support ticket"
+      ],
+      "parameters": [
+        {
+          "id": "ticket_number",
+          "entityType": "@sys.any",
+          "required": false
+        }
+      ],
+      "webhookFulfillment": true
+    },
+    {
+      "displayName": "create.ticket",
+      "trainingPhrases": [
+        "create a ticket",
+        "open a support ticket",
+        "I need help with {subject}",
+        "report an issue"
+      ],
+      "parameters": [
+        {
+          "id": "subject",
+          "entityType": "@sys.any",
+          "required": false
+        },
+        {
+          "id": "customer_id",
+          "entityType": "@sys.any",
+          "required": false
+        }
+      ],
+      "webhookFulfillment": true
+    },
+    {
+      "displayName": "list.tickets",
+      "trainingPhrases": [
+        "show my tickets",
+        "list my support tickets",
+        "what tickets do I have open"
+      ],
+      "parameters": [
+        {
+          "id": "customer_id",
+          "entityType": "@sys.any",
+          "required": false
+        }
+      ],
+      "webhookFulfillment": true
+    },
+    {
+      "displayName": "knowledge.search",
+      "trainingPhrases": [
+        "how do I {search_query}",
+        "what is the policy for {search_query}",
+        "tell me about {search_query}",
+        "help me with {search_query}"
+      ],
+      "parameters": [
+        {
+          "id": "search_query",
+          "entityType": "@sys.any",
+          "required": false
+        }
+      ],
+      "webhookFulfillment": true
+    },
+    {
+      "displayName": "faq.billing",
+      "trainingPhrases": [
+        "billing question", "payment issue", "refund", "invoice", "subscription charge"
+      ],
+      "webhookFulfillment": true
+    },
+    {
+      "displayName": "faq.shipping",
+      "trainingPhrases": [
+        "shipping time", "delivery status", "track my order", "when will it arrive"
+      ],
+      "webhookFulfillment": true
+    },
+    {
+      "displayName": "faq.returns",
+      "trainingPhrases": [
+        "return policy", "how to return", "exchange item", "return my order"
+      ],
+      "webhookFulfillment": true
+    },
+    {
+      "displayName": "faq.account",
+      "trainingPhrases": [
+        "reset password", "deactivate account", "change email", "account settings"
+      ],
+      "webhookFulfillment": true
+    },
+    {
+      "displayName": "agent.escalation",
+      "trainingPhrases": [
+        "speak to agent", "talk to human", "connect me to support", "escalate"
+      ],
+      "webhookFulfillment": true
+    }
+  ],
+  "entityTypes": [
+    {
+      "displayName": "ticket_number",
+      "kind": "KIND_REGEXP",
+      "entities": [
+        {
+          "value": "SA-XXXXXXXX",
+          "synonyms": ["SA-"]
+        }
+      ],
+      "autoExpansionMode": "AUTO_EXPANSION_MODE_DEFAULT",
+      "allowFuzzyExtraction": true
+    }
+  ],
+  "webhook": {
+    "genericWebService": {
+      "uri": "https://YOUR_CLOUD_FUNCTION_URL/api/v1/webhook",
+      "requestHeaders": {
+        "Content-Type": "application/json"
+      }
+    },
+    "timeout": "30s"
+  },
+  "flowSettings": {
+    "fallbackIntent": {
+      "displayName": "Default Fallback Intent",
+      "webhookFulfillment": true
+    }
+  }
+}
